@@ -1,0 +1,798 @@
+// DeTrust Database Schema
+// Decentralized Trust & Capability Scoring System for Freelancers
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  CLIENT
+  FREELANCER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum JobType {
+  FIXED_PRICE
+  HOURLY
+}
+
+enum ProposalStatus {
+  PENDING
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ContractStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  SUBMITTED
+  REVISION_REQUESTED
+  APPROVED
+  PAID
+  DISPUTED
+}
+
+enum DisputeStatus {
+  OPEN
+  VOTING
+  RESOLVED
+  APPEALED
+}
+
+enum DisputeOutcome {
+  PENDING
+  CLIENT_WINS
+  FREELANCER_WINS
+  SPLIT
+}
+
+enum NotificationType {
+  JOB_POSTED
+  PROPOSAL_RECEIVED
+  PROPOSAL_ACCEPTED
+  PROPOSAL_REJECTED
+  CONTRACT_CREATED
+  MILESTONE_SUBMITTED
+  MILESTONE_APPROVED
+  MILESTONE_AUTO_APPROVED
+  PAYMENT_RELEASED
+  REVIEW_RECEIVED
+  DISPUTE_OPENED
+  DISPUTE_VOTING
+  DISPUTE_RESOLVED
+  MESSAGE_RECEIVED
+  SYSTEM
+}
+
+enum SkillVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
+enum SecureFileCategory {
+  AVATAR
+  RESUME
+  CERTIFICATION
+  EVIDENCE
+  MESSAGE_ATTACHMENT
+}
+
+enum SecureFileVisibility {
+  PRIVATE
+  AUTHENTICATED
+  PUBLIC
+}
+
+enum SecureFileResourceType {
+  USER
+  FREELANCER_PROFILE
+  CERTIFICATION
+  DISPUTE
+  MESSAGE
+}
+
+enum KycStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// =============================================================================
+// USER DOMAIN
+// =============================================================================
+
+model User {
+  id              String     @id @default(cuid())
+  walletAddress   String?    @unique
+  email           String?    @unique
+  passwordHash    String?
+  name            String?
+  avatarUrl       String?
+  role            UserRole   @default(FREELANCER)
+  status          UserStatus @default(ACTIVE)
+  emailVerified   Boolean    @default(false)
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret String?
+  nonce           String?    // For SIWE authentication
+  kycStatus       KycStatus  @default(NONE)
+  kycDocumentType String?
+  kycIdNumber     String?
+  kycCountry      String?
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  freelancerProfile   FreelancerProfile?
+  clientProfile       ClientProfile?
+  jobsPosted          Job[]              @relation("ClientJobs")
+  proposals           Proposal[]
+  contracts           Contract[]         @relation("FreelancerContracts")
+  clientContracts     Contract[]         @relation("ClientContracts")
+  reviewsGiven        Review[]           @relation("ReviewAuthor")
+  reviewsReceived     Review[]           @relation("ReviewSubject")
+  disputesInitiated   Dispute[]          @relation("DisputeInitiator")
+  disputeVotes        DisputeVote[]
+  evidenceUploads     DisputeEvidence[]   @relation("EvidenceUploader")
+  messagesSent        Message[]          @relation("MessageSender")
+  messagesReceived    Message[]          @relation("MessageReceiver")
+  notifications       Notification[]
+  sessions            Session[]
+  secureFiles         SecureFile[]
+  trustScoreHistory   TrustScoreHistory[]
+
+  @@index([walletAddress])
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model FreelancerProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  title             String?
+  bio               String?  @db.Text
+  hourlyRate        Decimal? @db.Decimal(10, 2)
+  availability      String?  // e.g., "Full-time", "Part-time", "Not Available"
+  location          String?
+  timezone          String?
+  languages         String[] // Array of languages
+  portfolioLinks    String[] // Array of portfolio URLs
+  resumeUrl         String?
+  linkedinUrl       String?
+  githubUrl         String?
+  websiteUrl        String?
+  
+  // Trust & Capability Scores
+  trustScore        Decimal  @default(0) @db.Decimal(5, 2) // 0-100
+  aiCapabilityScore Decimal  @default(0) @db.Decimal(5, 2) // 0-100 AI-predicted score
+  totalEarnings     Decimal  @default(0) @db.Decimal(18, 2)
+  completedJobs     Int      @default(0)
+  successRate       Decimal  @default(0) @db.Decimal(5, 2) // Percentage
+  avgRating         Decimal  @default(0) @db.Decimal(3, 2) // 0-5
+  totalReviews      Int      @default(0)
+  
+  // Profile Completeness
+  profileComplete   Boolean  @default(false)
+  completenessScore Int      @default(0) // Percentage 0-100
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills            FreelancerSkill[]
+  certifications    Certification[]
+  education         Education[]
+  experience        Experience[]
+  portfolioItems    PortfolioItem[]
+
+  @@index([trustScore])
+  @@index([aiCapabilityScore])
+  @@index([hourlyRate])
+}
+
+model ClientProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  companyName     String?
+  companySize     String?  // e.g., "1-10", "11-50", "51-200", etc.
+  industry        String?
+  companyWebsite  String?
+  description     String?  @db.Text
+  location        String?
+  
+  // Trust Score
+  trustScore      Decimal  @default(0) @db.Decimal(5, 2) // 0-100
+  totalSpent      Decimal  @default(0) @db.Decimal(18, 2)
+  jobsPosted      Int      @default(0)
+  hireRate        Decimal  @default(0) @db.Decimal(5, 2) // Percentage of jobs that resulted in hire
+  avgRating       Decimal  @default(0) @db.Decimal(3, 2) // 0-5
+  totalReviews    Int      @default(0)
+  paymentVerified Boolean  @default(false)
+
+  // Profile Completeness
+  profileComplete   Boolean  @default(false)
+  completenessScore Int      @default(0) // Percentage 0-100
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([trustScore])
+}
+
+// =============================================================================
+// TRUST SCORE HISTORY (Module 4 — SRS FE-4 Historical Trends)
+// =============================================================================
+
+model TrustScoreHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  score     Decimal  @db.Decimal(5, 2) // 0-100
+  breakdown Json?    // Snapshot of component breakdown at this point in time
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// =============================================================================
+// SKILLS & VERIFICATION
+// =============================================================================
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  category    String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  freelancerSkills FreelancerSkill[]
+  jobSkills        JobSkill[]
+
+  @@index([category])
+  @@index([slug])
+}
+
+model FreelancerSkill {
+  id                  String                  @id @default(cuid())
+  freelancerProfileId String
+  skillId             String
+  yearsExperience     Int?
+  proficiencyLevel    Int?                    @default(1) // 1-5
+  verificationStatus  SkillVerificationStatus @default(UNVERIFIED)
+  verifiedAt          DateTime?
+  verificationScore   Int?                    // Score from skill test
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+  skill             Skill             @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([freelancerProfileId, skillId])
+  @@index([verificationStatus])
+}
+
+model Certification {
+  id                  String    @id @default(cuid())
+  freelancerProfileId String
+  name                String
+  issuer              String
+  issueDate           DateTime?
+  expiryDate          DateTime?
+  credentialId        String?
+  credentialUrl       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+}
+
+model Education {
+  id                  String    @id @default(cuid())
+  freelancerProfileId String
+  institution         String
+  degree              String
+  fieldOfStudy        String?
+  startDate           DateTime?
+  endDate             DateTime?
+  description         String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+}
+
+model Experience {
+  id                  String    @id @default(cuid())
+  freelancerProfileId String
+  title               String
+  company             String
+  location            String?
+  startDate           DateTime
+  endDate             DateTime?
+  isCurrent           Boolean   @default(false)
+  description         String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+}
+
+model PortfolioItem {
+  id                  String    @id @default(cuid())
+  freelancerProfileId String
+  title               String
+  description         String?   @db.Text
+  projectUrl          String?
+  repoUrl             String?
+  imageUrl            String?
+  techStack           String[]
+  startDate           DateTime?
+  endDate             DateTime?
+  isFeatured          Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  freelancerProfile FreelancerProfile @relation(fields: [freelancerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([freelancerProfileId])
+}
+
+model SecureFile {
+  id                 String                  @id @default(cuid())
+  userId             String
+  category           SecureFileCategory
+  visibility         SecureFileVisibility   @default(PRIVATE)
+  storageProvider    String                 @default("LIGHTHOUSE")
+  cid                String
+  filename           String
+  mimeType           String
+  size               Int
+  checksum           String?
+  encryptionAlgorithm String                @default("AES-256-GCM")
+  encryptionSalt     String
+  encryptionIv       String
+  encryptionAuthTag  String
+  resourceType       SecureFileResourceType?
+  resourceId         String?
+  metadata           Json?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category])
+  @@index([resourceType, resourceId])
+}
+
+// =============================================================================
+// JOB DOMAIN
+// =============================================================================
+
+model Job {
+  id              String    @id @default(cuid())
+  clientId        String
+  title           String
+  description     String    @db.Text
+  category        String
+  type            JobType   @default(FIXED_PRICE)
+  budget          Decimal?  @db.Decimal(18, 2)
+  hourlyRateMin   Decimal?  @db.Decimal(10, 2)
+  hourlyRateMax   Decimal?  @db.Decimal(10, 2)
+  estimatedHours  Int?
+  deadline        DateTime?
+  status          JobStatus @default(DRAFT)
+  visibility      String    @default("PUBLIC") // PUBLIC, PRIVATE, INVITE_ONLY
+  experienceLevel String?   // ENTRY, INTERMEDIATE, EXPERT
+  attachments     String[]  // Array of IPFS hashes or URLs
+  
+  // Stats
+  proposalCount   Int       @default(0)
+  viewCount       Int       @default(0)
+  
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  client    User       @relation("ClientJobs", fields: [clientId], references: [id], onDelete: Cascade)
+  skills    JobSkill[]
+  proposals Proposal[]
+  contract  Contract?
+  messages  Message[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([category])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model JobSkill {
+  id        String   @id @default(cuid())
+  jobId     String
+  skillId   String
+  isRequired Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  job   Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, skillId])
+}
+
+// =============================================================================
+// PROPOSAL DOMAIN
+// =============================================================================
+
+model Proposal {
+  id                String         @id @default(cuid())
+  jobId             String
+  freelancerId      String
+  coverLetter       String         @db.Text
+  proposedRate      Decimal        @db.Decimal(18, 2)
+  estimatedDuration String?        // e.g., "2 weeks", "1 month"
+  milestones        Json?          // Proposed milestones
+  attachments       String[]       // Array of IPFS hashes or URLs
+  status            ProposalStatus @default(PENDING)
+  clientNote        String?        @db.Text // Note from client (rejection reason, etc.)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  freelancer User     @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  contract   Contract?
+
+  @@unique([jobId, freelancerId])
+  @@index([jobId])
+  @@index([freelancerId])
+  @@index([status])
+}
+
+// =============================================================================
+// CONTRACT DOMAIN
+// =============================================================================
+
+model Contract {
+  id                  String         @id @default(cuid())
+  jobId               String         @unique
+  proposalId          String         @unique
+  clientId            String
+  freelancerId        String
+  
+  // Contract Details
+  title               String
+  description         String?        @db.Text
+  totalAmount         Decimal        @db.Decimal(18, 2)
+  status              ContractStatus @default(PENDING)
+
+  // Billing
+  billingType         String         @default("FIXED") // "FIXED" | "HOURLY"
+  hourlyRate          Decimal?       @db.Decimal(10, 2)
+  weeklyHourLimit     Int?
+  
+  // Blockchain Data
+  escrowAddress       String?        // Smart contract address
+  blockchainJobId     String?        // bytes32 job ID on chain
+  fundingTxHash       String?
+  
+  // Timestamps
+  startDate           DateTime?
+  endDate             DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  job         Job         @relation(fields: [jobId], references: [id])
+  proposal    Proposal    @relation(fields: [proposalId], references: [id])
+  client      User        @relation("ClientContracts", fields: [clientId], references: [id])
+  freelancer  User        @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  milestones  Milestone[]
+  disputes    Dispute[]
+  reviews     Review[]
+
+  @@index([clientId])
+  @@index([freelancerId])
+  @@index([status])
+}
+
+model Milestone {
+  id                String          @id @default(cuid())
+  contractId        String
+  title             String
+  description       String?         @db.Text
+  amount            Decimal         @db.Decimal(18, 2)
+  orderIndex        Int             // Order in the contract
+  status            MilestoneStatus @default(PENDING)
+  dueDate           DateTime?
+  
+  // Deliverables
+  deliverableHash   String?         // IPFS hash of submitted work
+  deliverableUrl    String?         // Direct URL or secure file reference for downloads
+  deliverableNote   String?         @db.Text
+  
+  // Client Feedback
+  revisionNote      String?         @db.Text
+  revisionCount     Int             @default(0)
+  
+  // Blockchain Data
+  paymentTxHash     String?
+  
+  // Timestamps
+  submittedAt       DateTime?
+  approvedAt        DateTime?
+  paidAt            DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  contract    Contract    @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@index([contractId])
+  @@index([status])
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  milestoneId String
+  date        DateTime @db.Date
+  hours       Decimal  @db.Decimal(4, 2) // e.g. 7.50
+  description String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([milestoneId, date])
+  @@index([milestoneId])
+}
+
+// =============================================================================
+// REVIEW DOMAIN
+// =============================================================================
+
+model Review {
+  id                  String   @id @default(cuid())
+  contractId          String
+  authorId            String
+  subjectId           String
+  
+  // Ratings (1-5)
+  overallRating       Decimal  @db.Decimal(3, 2)
+  communicationRating Decimal? @db.Decimal(3, 2)
+  qualityRating       Decimal? @db.Decimal(3, 2)
+  timelinessRating    Decimal? @db.Decimal(3, 2)
+  professionalismRating Decimal? @db.Decimal(3, 2)
+  
+  comment             String?  @db.Text
+  
+  // Rebuttal: one-time immutable response from the reviewed party (SRS M3-I6)
+  responseText        String?  @db.Text
+  responseAt          DateTime?
+  
+  // Blockchain Data
+  ipfsHash            String?  // Review content stored on IPFS
+  blockchainTxHash    String?  // Transaction hash on ReputationRegistry
+  
+  isPublic            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  author   User     @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  subject  User     @relation("ReviewSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, authorId])
+  @@index([subjectId])
+  @@index([overallRating])
+}
+
+// =============================================================================
+// DISPUTE DOMAIN
+// =============================================================================
+
+model Dispute {
+  id              String         @id @default(cuid())
+  contractId      String
+  initiatorId     String
+  
+  reason          String
+  description     String         @db.Text
+  evidence        String[]       // Array of IPFS hashes
+  
+  status          DisputeStatus  @default(OPEN)
+  outcome         DisputeOutcome @default(PENDING)
+  resolution      String?        @db.Text
+  
+  // Voting Data
+  clientVotes     Int            @default(0)
+  freelancerVotes Int            @default(0)
+  votingDeadline  DateTime?
+  
+  // Blockchain Data
+  blockchainDisputeId String?
+  resolutionTxHash    String?
+  
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  contract      Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  initiator     User              @relation("DisputeInitiator", fields: [initiatorId], references: [id])
+  votes         DisputeVote[]
+  evidenceItems DisputeEvidence[]
+
+  @@index([contractId])
+  @@index([status])
+}
+
+model DisputeEvidence {
+  id           String   @id @default(cuid())
+  disputeId    String
+  uploadedById String
+  url          String   // IPFS gateway URL or ipfs://cid or sha256:hash
+  cid          String?  // Raw IPFS CID (without prefix)
+  fileName     String?
+  fileSize     Int?     // bytes
+  description  String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  dispute    Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("EvidenceUploader", fields: [uploadedById], references: [id])
+
+  @@index([disputeId])
+}
+
+model DisputeVote {
+  id          String         @id @default(cuid())
+  disputeId   String
+  jurorId     String
+  vote        DisputeOutcome
+  weight      Int            @default(1) // Based on juror's trust score
+  reasoning   String?        @db.Text
+  createdAt   DateTime       @default(now())
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  juror   User    @relation(fields: [jurorId], references: [id])
+
+  @@unique([disputeId, jurorId])
+}
+
+// =============================================================================
+// COMMUNICATION DOMAIN
+// =============================================================================
+
+model Message {
+  id          String    @id @default(cuid())
+  senderId    String
+  receiverId  String
+  jobId       String?   // Optional: associated job
+  content     String    @db.Text
+  attachments String[]  // Array of IPFS hashes
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sender   User  @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User  @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  job      Job?  @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([jobId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?            // Additional data (e.g., jobId, contractId)
+  read      Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// SKILL TEST / VERIFICATION
+// =============================================================================
+
+model SkillTest {
+  id          String   @id @default(cuid())
+  skillId     String
+  name        String
+  description String?
+  questions   Json     // Array of questions
+  timeLimit   Int      // In minutes
+  passingScore Int     @default(70) // Percentage
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attempts SkillTestAttempt[]
+
+  @@index([skillId])
+}
+
+model SkillTestAttempt {
+  id          String   @id @default(cuid())
+  testId      String
+  userId      String
+  answers     Json     // User's answers
+  score       Int      // Percentage
+  passed      Boolean
+  timeTaken   Int      // In seconds
+  completedAt DateTime @default(now())
+
+  test SkillTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@index([testId])
+  @@index([userId])
+}

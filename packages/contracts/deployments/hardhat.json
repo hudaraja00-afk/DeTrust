@@ -1,0 +1,24 @@
+{
+  "network": "hardhat",
+  "chainId": 31337,
+  "timestamp": 1764258991,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "feeRecipient": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "contracts": {
+    "JobEscrow": {
+      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "blockNumber": 3,
+      "txHash": "0xd8c8546dc59cfb0fb02c908bed9cf12face9fbc160dfdc6fd20409a14e9c20e4"
+    },
+    "ReputationRegistry": {
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "blockNumber": 1,
+      "txHash": "0x540629799745aca0f20a8f3e0dfc438ca2f3b5270f91ddb9379cf3cbf11f321b"
+    },
+    "DisputeResolution": {
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "blockNumber": 2,
+      "txHash": "0x84b14a0a84cd3c9c5fb53868b7e13721d2e11888264cccd6e8a960cd8abcbb0f"
+    }
+  }
+}

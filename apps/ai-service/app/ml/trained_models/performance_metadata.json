@@ -1,0 +1,137 @@
+{
+  "tag": "performance",
+  "model_type": "XGBClassifier",
+  "target_column": "Capability_Level",
+  "target_classes": [
+    "Beginner",
+    "Expert",
+    "Intermediate"
+  ],
+  "feature_columns": [
+    "Job_Completed",
+    "Earnings_USD",
+    "Hourly_Rate",
+    "Job_Success_Rate",
+    "Client_Rating",
+    "Job_Duration_Days",
+    "Rehire_Rate",
+    "Job_Category_App Development",
+    "Job_Category_Content Writing",
+    "Job_Category_Customer Support",
+    "Job_Category_Data Entry",
+    "Job_Category_Digital Marketing",
+    "Job_Category_Graphic Design",
+    "Job_Category_SEO",
+    "Job_Category_Unknown",
+    "Job_Category_Web Development",
+    "Project_Type_Fixed",
+    "Project_Type_Hourly",
+    "Project_Type_Unknown",
+    "Client_Region_Asia",
+    "Client_Region_Australia",
+    "Client_Region_Canada",
+    "Client_Region_Europe",
+    "Client_Region_Middle East",
+    "Client_Region_UK",
+    "Client_Region_USA",
+    "Client_Region_Unknown"
+  ],
+  "metrics": {
+    "accuracy": 0.9931,
+    "f1_weighted": 0.9931,
+    "precision_weighted": 0.9931,
+    "recall_weighted": 0.9931,
+    "confusion_matrix": [
+      [
+        3992,
+        0,
+        19
+      ],
+      [
+        0,
+        4097,
+        36
+      ],
+      [
+        16,
+        13,
+        3982
+      ]
+    ],
+    "classification_report": {
+      "Beginner": {
+        "precision": 0.9960079840319361,
+        "recall": 0.9952630266766392,
+        "f1-score": 0.9956353660057363,
+        "support": 4011.0
+      },
+      "Expert": {
+        "precision": 0.9968369829683699,
+        "recall": 0.9912896201306557,
+        "f1-score": 0.9940555622952808,
+        "support": 4133.0
+      },
+      "Intermediate": {
+        "precision": 0.9863760217983651,
+        "recall": 0.9927698828222389,
+        "f1-score": 0.9895626242544732,
+        "support": 4011.0
+      },
+      "accuracy": 0.993089263677499,
+      "macro avg": {
+        "precision": 0.9930736629328903,
+        "recall": 0.9931075098765113,
+        "f1-score": 0.9930845175184967,
+        "support": 12155.0
+      },
+      "weighted avg": {
+        "precision": 0.9931114354581333,
+        "recall": 0.993089263677499,
+        "f1-score": 0.9930942639160919,
+        "support": 12155.0
+      }
+    }
+  },
+  "model_params": {
+    "objective": "multi:softprob",
+    "base_score": null,
+    "booster": null,
+    "callbacks": null,
+    "colsample_bylevel": null,
+    "colsample_bynode": null,
+    "colsample_bytree": 0.85,
+    "device": null,
+    "early_stopping_rounds": null,
+    "enable_categorical": false,
+    "eval_metric": "mlogloss",
+    "feature_types": null,
+    "feature_weights": null,
+    "gamma": null,
+    "grow_policy": null,
+    "importance_type": null,
+    "interaction_constraints": null,
+    "learning_rate": 0.1,
+    "max_bin": null,
+    "max_cat_threshold": null,
+    "max_cat_to_onehot": null,
+    "max_delta_step": null,
+    "max_depth": 6,
+    "max_leaves": null,
+    "min_child_weight": null,
+    "missing": NaN,
+    "monotone_constraints": null,
+    "multi_strategy": null,
+    "n_estimators": 400,
+    "n_jobs": -1,
+    "num_parallel_tree": null,
+    "random_state": 42,
+    "reg_alpha": null,
+    "reg_lambda": null,
+    "sampling_method": null,
+    "scale_pos_weight": null,
+    "subsample": 0.85,
+    "tree_method": null,
+    "validate_parameters": null,
+    "verbosity": 0
+  }
+}

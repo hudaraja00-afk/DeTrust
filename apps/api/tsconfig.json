@@ -1,0 +1,21 @@
+{
+  "extends": "@detrust/config/typescript/node",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": "./src",
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./*"],
+      "@config/*": ["./config/*"],
+      "@controllers/*": ["./controllers/*"],
+      "@middleware/*": ["./middleware/*"],
+      "@routes/*": ["./routes/*"],
+      "@services/*": ["./services/*"],
+      "@validators/*": ["./validators/*"],
+      "@utils/*": ["./utils/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"]
+}
