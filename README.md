@@ -174,6 +174,7 @@ venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ---
 
 ## 👥 Team
+-**Noor-Ul-Huda** - CIIT/FA22-BCS-081/ISB
 
 - **Haseeb Ahmad Khalil** - CIIT/FA22-BCS-027/ISB
 
